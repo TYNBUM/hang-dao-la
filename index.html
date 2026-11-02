@@ -6,8 +6,8 @@
   <meta name="description" content="夯到拉图片排名，支持拖拽排序、自动保存、图片导出、录音和录屏。">
   <title>夯到拉排名</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ff7979'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44'%3E夯%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css?v=3">
-  <script src="./recorder.js" defer></script><script src="./app.js?v=3" defer></script>
+  <link rel="stylesheet" href="./style.css?v=4">
+  <script src="./recorder.js" defer></script><script src="./app.js?v=4" defer></script>
 </head>
 <body>
   <header class="topbar"><a class="brand" href="./">夯到拉排名</a><div class="top-actions"><span id="saveStatus" role="status" class="save-state">正在读取…</span><button id="helpBtn" class="quiet">使用说明</button></div></header>
@@ -15,10 +15,10 @@
     <div class="workspace">
       <section class="ranking" aria-label="排名工作区">
         <div class="board-heading"><div><label class="sr-only" for="boardTitle">榜单标题</label><input id="boardTitle" maxlength="50" value="我的夯到拉排行榜" aria-label="榜单标题"></div><span id="rankCount" class="counter">0 / 0 已排名</span></div>
-        <div class="toolbar"><div class="button-group"><button id="uploadBtn" class="primary">上传图片</button><button id="undoBtn" disabled title="Ctrl / ⌘ + Z">撤销</button><button id="editTiersBtn">修改栏目</button><button id="exportBtn">导出图片</button><button id="recordToggle" aria-expanded="false" aria-controls="recordPanel">录音 / 录屏</button><button id="focusBtn">专注模式</button></div><div class="view-options"><label class="theme-picker" for="themeSelect">底色 <select id="themeSelect"><option value="white">白底</option><option value="black">黑底</option></select></label><label class="name-toggle"><input id="namesToggle" type="checkbox">显示图片名</label></div></div>
+        <div class="toolbar"><div class="button-group"><button id="uploadBtn" class="primary">上传图片</button><button id="materialsBtn">Galgame 封面</button><button id="undoBtn" disabled title="Ctrl / ⌘ + Z">撤销</button><button id="editTiersBtn">修改栏目</button><button id="exportBtn">导出图片</button><button id="recordToggle" aria-expanded="false" aria-controls="recordPanel">录音 / 录屏</button><button id="focusBtn">专注模式</button></div><div class="view-options"><label class="theme-picker" for="themeSelect">底色 <select id="themeSelect"><option value="white">白底</option><option value="black">黑底</option></select></label><label class="name-toggle"><input id="namesToggle" type="checkbox">显示图片名</label></div></div>
         <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden>
         <div id="board" aria-label="分级排名板"></div>
-        <div class="pool-heading"><h2>待排名 <span id="poolCount">0</span></h2><span>拖拽排序 · 点击图片可预览</span></div>
+        <div class="pool-heading"><h2>待排名 <span id="poolCount">0</span></h2><div class="pool-actions"><span>拖拽排序 · 点击图片可预览</span><button id="trashTarget" class="dropzone trash-target" data-zone="trash" aria-label="垃圾桶，拖入图片丢弃或点击查看"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><span>垃圾桶 <b id="trashCount">0</b></span></button></div></div>
         <div id="pool" class="dropzone pool" data-zone="pool" aria-label="待排名图片"></div>
         <div class="bottom-tools"><span>图片仅保存在本机浏览器</span><div><button id="backupBtn" class="quiet">保存项目</button><button id="restoreBtn" class="quiet">打开项目</button><button id="resetBtn" class="quiet">全部移回待排名</button></div></div>
         <input id="projectInput" type="file" accept=".json,application/json" hidden>
@@ -32,13 +32,15 @@
           <p class="small" id="recordHint">选择要录制的标签页、窗口或屏幕。共享声音需在浏览器弹窗中勾选。</p>
           <div id="recordings" class="recordings" aria-label="录制文件"></div>
         </section>
-        <section class="panel preview-panel" hidden><div class="panel-heading"><h2>图片设置</h2><button id="closePreview" class="quiet" aria-label="收起图片设置">×</button></div><div id="preview" class="preview"><p class="small">点击图片预览</p></div><div id="itemTools" hidden><label class="sr-only" for="itemName">图片名称</label><input id="itemName" maxlength="60" placeholder="图片名称"><div class="move-row"><select id="moveTarget" aria-label="移动到分级"></select><button id="moveBtn">移入</button></div><div class="item-actions"><button id="leftBtn" title="在当前栏前移">← 前移</button><button id="rightBtn" title="在当前栏后移">后移 →</button><button id="deleteBtn" class="quiet danger">删除</button></div></div></section>
+        <section class="panel preview-panel" hidden><div class="panel-heading"><h2>图片设置</h2><button id="closePreview" class="quiet" aria-label="收起图片设置">×</button></div><div id="preview" class="preview"><p class="small">点击图片预览</p></div><div id="itemTools" hidden><p id="itemSource" class="small" hidden></p><label class="sr-only" for="itemName">图片名称</label><input id="itemName" maxlength="60" placeholder="图片名称"><div class="move-row"><select id="moveTarget" aria-label="移动到分级"></select><button id="moveBtn">移入</button></div><div class="item-actions"><button id="leftBtn" title="在当前栏前移">← 前移</button><button id="rightBtn" title="在当前栏后移">后移 →</button><button id="deleteBtn" class="quiet danger">扔进垃圾桶</button></div></div></section>
       </aside>
     </div>
   </main>
   <div id="focusBar" hidden><span>夯到拉</span><span id="focusTimer"></span><button id="focusStop" hidden>■ 结束录制</button><button id="exitFocus">退出专注 Esc</button></div>
   <dialog id="tiersDialog"><div class="dialog-heading"><h2>修改栏目</h2><button data-close="tiersDialog" aria-label="关闭修改栏目">×</button></div><p class="muted">修改栏目名称和标签颜色。</p><form id="tiersForm"><div id="tierFields"></div><button class="primary wide" type="submit">保存分级</button></form></dialog>
   <dialog id="helpDialog"><div class="dialog-heading"><h2>使用说明</h2><button data-close="helpDialog" aria-label="关闭使用指南">×</button></div><ol class="help-list"><li><strong>添加素材</strong><p>点击上传，或把图片文件直接拖进页面；也支持粘贴截图。JPG、PNG、WebP、GIF、AVIF，单张不超过 20 MB。动图按静态帧导入。</p></li><li><strong>拖拽排名</strong><p>拖进任意栏位，再拖动调整前后顺序。也可点击图片，在“图片设置”选择分级，或用前移 / 后移按钮排序。</p></li><li><strong>导出或录制</strong><p>导出高清 PNG；录音使用麦克风，录屏可叠加解说。停止后在录制面板预览、下载文件。</p></li></ol><p class="small">录音录屏需要 HTTPS 或 localhost，建议在桌面 Chrome / Edge 打开。手机及部分内嵌浏览器不支持录屏。屏幕声音能否录入取决于浏览器和所选共享来源。</p><p class="small">榜单自动保存到当前浏览器；清理网站数据会删除存档。可用“保存项目”备份并跨设备恢复。录制文件仅在本次页面中保留，请下载后再关闭。长时间录制会占用内存，建议分段录制。</p></dialog>
+  <dialog id="materialsDialog"><div class="dialog-heading"><h2>Bangumi Galgame 封面</h2><button data-close="materialsDialog" aria-label="关闭封面素材">×</button></div><p class="small">按 Bangumi「Galgame」标签排名排序，榜单快照：2026-11-02。不同版本保留原榜单条目。</p><div class="preset-buttons"><button data-preset="20">加入前 20</button><button data-preset="50">加入前 50</button><button data-preset="100">加入前 100</button></div><p id="presetStatus" class="small" role="status">封面加入待排名区，保留当前排名；已有和已丢弃的条目会跳过。</p><p class="small source-note">排名来自 <a href="https://bgm.tv/game/tag/galgame/?sort=rank" target="_blank" rel="noopener noreferrer">Bangumi</a>。封面从 Bangumi、VNDB 及公开发行页面整理，少数条目使用其他发行版封面、标题或游戏画面，点击图片可查看具体说明与来源。图片版权归各作品权利人。</p></dialog>
+  <dialog id="trashDialog"><div class="dialog-heading"><h2>垃圾桶</h2><button data-close="trashDialog" aria-label="关闭垃圾桶">×</button></div><p class="small">不认识的图片可以直接拖进垃圾桶。这里的图片不参与排名和导出，随时可恢复。</p><button id="restoreAllTrash" class="trash-restore-all">全部恢复到待排名</button><div id="trashList" class="trash-list"></div></dialog>
   <div id="toast" role="status"></div><div id="fileOverlay" hidden>松手添加图片 <span>只在你的浏览器里处理</span></div>
 </body>
 </html>

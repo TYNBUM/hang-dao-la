@@ -11,7 +11,9 @@
 - 白底黑线表格，直角彩色栏目标签，无英文分级副标题；图片名称可按需显示。
 - 五档默认分级：夯、顶级、人上人、NPC、拉；可修改名称和颜色。
 - 鼠标 / 触屏拖拽，跨栏移动、栏内排序；点击图片后也可用“移入”“前移”“后移”操作。
-- 图片预览、重命名、删除、最近 20 步撤销；Ctrl / Command + Z。
+- 图片预览、重命名、拖入垃圾桶、恢复、最近 20 步撤销；Ctrl / Command + Z。
+- 内置 Bangumi Galgame 前 20 / 50 / 100 图片包，可逐步追加，重复条目自动跳过。
+- 垃圾桶里的图片不参与排名与导出；自动保存、项目备份和撤销都保留垃圾桶状态。
 - IndexedDB 自动保存图片与排名，刷新后恢复；JSON 项目备份与导入。
 - 导出 1600 像素宽 PNG，包含标题、五档排名和尚未排名的图片。
 - 麦克风录音、屏幕录制；可选屏幕声音和麦克风解说，自动混音。
@@ -25,7 +27,7 @@
 4. Source 选择 **Deploy from a branch**，Branch 选择 **main**，目录选择 **/(root)**，点击 **Save**。
 5. 等待发布完成，在 Pages 页面打开显示的网址，通常为 `https://你的用户名.github.io/hang-dao-la/`。
 
-只需要 `index.html`、`style.css`、`app.js`、`recorder.js` 和 `.nojekyll`。README 和 LICENSE 可以一起保留。使用相对资源路径，支持部署在仓库子路径。
+只需要 `index.html`、`style.css`、`app.js`、`recorder.js`、`bangumi-galgame.js` 和 `.nojekyll`。README 和 LICENSE 可以一起保留。使用相对资源路径，支持部署在仓库子路径。
 
 官方文档：https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 
@@ -60,7 +62,7 @@ python -m http.server 8080 --bind 127.0.0.1
 ## 存储与限制
 
 - 图片在浏览器内解码，最长边缩放至 640 像素，以节省本地空间；透明背景保留，GIF 按静态帧处理。
-- 每张源文件最多 20 MB，每个项目最多 300 张；项目导入最多 100 MB。
+- 每张源文件最多 20 MB，每个项目最多 300 张（含垃圾桶）；项目导入最多 100 MB。
 - 自动保存属于当前浏览器和网站地址。切换设备、无痕模式或清除网站数据，不会保留原站点存档。
 - 用“保存项目”下载包含图片的 JSON 备份；其他设备用“打开项目”恢复。
 - 存储失败会显示提示，不会声称保存成功。建议定期导出项目备份。
@@ -73,7 +75,18 @@ index.html    页面结构与中文操作提示
 style.css     白底表格、移动端适配、专注模式
 app.js        排名、图片处理、IndexedDB、项目导入导出、PNG 导出
 recorder.js   浏览器媒体录制与资源释放
+bangumi-galgame.js  按需加载的榜单快照、图片数据与来源
 .nojekyll     GitHub Pages 静态文件标记
 ```
 
-采用 MIT 许可，可自由修改和部署。用户导入的图片版权不属于本项目许可范围。
+## Bangumi 图片包
+
+点击工具栏“Galgame 封面”，选择前 20、50 或 100。图片追加到待排名区，不会覆盖已有排序；已经加入或扔进垃圾桶的条目会跳过。误扔时，点击垃圾桶可以单独恢复或全部恢复。
+
+榜单来自 [Bangumi Galgame 标签按排名排序](https://bgm.tv/game/tag/galgame/?sort=rank)，快照日期为 **2026-11-02**，不是实时更新，也不是全体游戏总榜。不同发行版本按原榜单分别保留。
+
+100 个条目均提供本地图片，来源为 Bangumi、[VNDB](https://vndb.org/) 和 Steam 公开页面。少数使用其他发行版封面；《天鹅之歌》使用标题画面，《乐园》和原版《YU-NO》使用游戏画面。点选图片可查看 Bangumi 条目、图片来源及替代图片说明。素材数据内保留原名、Bangumi 总榜名次和来源地址。
+
+图片随网站打包，首次选择素材时才加载；不需要登录或令牌，不会在使用时请求第三方图片。之后排名、项目备份及 PNG 导出直接使用内嵌数据。
+
+代码采用 MIT 许可，可自由修改和部署。内置与用户导入的图片版权归各作品权利人，不属于 MIT 许可范围。

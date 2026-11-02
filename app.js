@@ -5,7 +5,7 @@ const oldColors = ['#ff7979','#ffb276','#ffe18a','#9fdbad','#8db9e8'];
 const defaults = () => ({version: 1, background: 'white', displayNames: false, title: '我的夯到拉排行榜', tiers: [
   {id:'t0',name:'夯',color:classicColors[0]}, {id:'t1',name:'顶级',color:classicColors[1]},
   {id:'t2',name:'人上人',color:classicColors[2]}, {id:'t3',name:'NPC',color:classicColors[3]}, {id:'t4',name:'拉',color:classicColors[4]}
-], items: [], order: {t0:[],t1:[],t2:[],t3:[],t4:[],pool:[]}});
+], items: [], order: {t0:[],t1:[],t2:[],t3:[],t4:[],pool:[],trash:[]}});
 let state = defaults(), selected = null, history = [], db, saveChain = Promise.resolve(), revision = 0, savedRevision = 0, importing = false;
 let toastTimer, drag = null, ignoreClickUntil = 0, recordMode = 'screen', recordFiles = 0;
 
@@ -31,6 +31,7 @@ function commit() { render(); save(); }
 function itemById(id) { return state.items.find(i => i.id === id); }
 function tile(item) {
   const button = document.createElement('button'); button.className = 'tile'; button.dataset.item = item.id;
+  button.title = item.name;
   button.setAttribute('aria-label', `选择图片：${item.name}`); button.classList.toggle('selected', selected === item.id);
   const img = new Image(); img.src = item.src; img.alt = item.name; img.draggable = false;
   const label = document.createElement('span'); label.textContent = item.name; button.append(img, label); return button;
@@ -56,13 +57,15 @@ function render() {
   $('pool').replaceChildren(); fillZone($('pool'),state.order.pool);
   if (!state.order.pool.length) {
     const empty = document.createElement('div'); empty.className = 'empty-pool';
-    const title = document.createElement('b'); title.textContent = state.items.length ? '所有图片已排名' : '上传图片，或拖入图片文件';
+    const title = document.createElement('b'); title.textContent = state.items.length - state.order.trash.length ? '所有图片已排名' : '上传图片，或拖入图片文件';
     const sub = document.createElement('small'); sub.textContent = '支持批量上传 / 粘贴截图 · JPG、PNG、WebP、GIF、AVIF'; empty.append(title,sub);
     if (!state.items.length) { const demo = document.createElement('button'); demo.textContent = '载入示例'; demo.onclick = addDemo; empty.append(document.createElement('br'),demo); }
     $('pool').append(empty);
   }
   $('poolCount').textContent = state.order.pool.length;
-  $('rankCount').textContent = `${state.items.length - state.order.pool.length} / ${state.items.length} 已排名`;
+  const activeCount = state.items.length - state.order.trash.length;
+  $('rankCount').textContent = `${activeCount - state.order.pool.length} / ${activeCount} 已排名`;
+  $('trashCount').textContent = state.order.trash.length; renderTrash();
   $('undoBtn').disabled = !history.length; renderPreview();
 }
 function renderPreview() {
@@ -70,6 +73,9 @@ function renderPreview() {
   document.querySelectorAll('.tile').forEach(el => el.classList.toggle('selected',el.dataset.item === selected));
   if (!item) { $('preview').innerHTML = '<p class="small">点击图片预览</p>'; return; }
   const img = new Image(); img.src = item.src; img.alt = item.name; $('preview').replaceChildren(img); $('itemName').value = item.name;
+  $('itemSource').replaceChildren(); $('itemSource').hidden = !item.bgmId;
+  if (item.bgmId) { const link = document.createElement('a'); link.href = `https://bgm.tv/subject/${item.bgmId}`; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Bangumi 条目'; $('itemSource').append(link); if (item.coverSourceUrl) { const coverLink = document.createElement('a'); coverLink.href = item.coverSourceUrl; coverLink.target = '_blank'; coverLink.rel = 'noopener noreferrer'; coverLink.textContent = `封面来源：${item.coverSource || '公开页面'}`; $('itemSource').append(' · ', coverLink); } }
+  if (item.coverNote) { const note = document.createElement('span'); note.className = 'cover-note'; note.textContent = item.coverNote; $('itemSource').append(note); }
   $('moveTarget').replaceChildren();
   [...state.tiers,{id:'pool',name:'待排名'}].forEach(t => { const option = new Option(t.name,t.id); $('moveTarget').add(option); });
   $('moveTarget').value = Object.keys(state.order).find(key => state.order[key].includes(selected));
@@ -78,13 +84,59 @@ function move(id, zone, before = null) {
   if (!itemById(id) || !state.order[zone] || before === id) return;
   snapshot(); for (const list of Object.values(state.order)) { const index = list.indexOf(id); if (index >= 0) list.splice(index,1); }
   const list = state.order[zone]; const index = before ? list.indexOf(before) : -1;
-  list.splice(index < 0 ? list.length : index,0,id); selected = id; commit();
+  list.splice(index < 0 ? list.length : index,0,id); selected = zone === 'trash' ? null : id; commit(); if (zone === 'trash') toast('已放进垃圾桶，可随时恢复。');
 }
 function shiftSelected(delta) {
   const key = Object.keys(state.order).find(k => state.order[k].includes(selected)); if (!key) return;
   const list = state.order[key], index = list.indexOf(selected), next = index + delta;
   if (next < 0 || next >= list.length) return; snapshot(); [list[index],list[next]] = [list[next],list[index]]; commit();
 }
+function renderTrash() {
+  $('trashList').replaceChildren(); $('restoreAllTrash').disabled = !state.order.trash.length;
+  if (!state.order.trash.length) { const text = document.createElement('p'); text.className = 'small'; text.textContent = '垃圾桶是空的'; $('trashList').append(text); return; }
+  state.order.trash.forEach(id => {
+    const item = itemById(id), row = document.createElement('div'); row.className = 'trash-item';
+    const img = new Image(); img.src = item.src; img.alt = item.name;
+    const name = document.createElement('span'); name.textContent = item.name;
+    const button = document.createElement('button'); button.textContent = '恢复'; button.setAttribute('aria-label', `恢复：${item.name}`); button.onclick = () => move(id,'pool');
+    row.append(img,name,button); $('trashList').append(row);
+  });
+}
+let presetPromise;
+function getPresetPack() {
+  if (window.BANGUMI_GALGAME_PACK) return Promise.resolve(window.BANGUMI_GALGAME_PACK);
+  if (!presetPromise) presetPromise = new Promise((resolve,reject) => {
+    const script = document.createElement('script'); script.src = './bangumi-galgame.js?v=4';
+    script.onload = () => { if (window.BANGUMI_GALGAME_PACK?.items?.length === 100) resolve(window.BANGUMI_GALGAME_PACK); else { presetPromise = null; script.remove(); reject(new Error('素材包内容不完整')); } };
+    script.onerror = () => { presetPromise = null; script.remove(); reject(new Error('素材包加载失败，请稍后重试')); };
+    document.head.append(script);
+  });
+  return presetPromise;
+}
+async function loadPreset(count) {
+  if (![20,50,100].includes(count)) return;
+  if (importing) return toast('图片正在处理中，请稍候。');
+  importing = true; $('uploadBtn').disabled = true; document.querySelectorAll('[data-preset]').forEach(button => button.disabled = true);
+  $('presetStatus').textContent = '正在加载封面素材…';
+  try {
+    const pack = await getPresetPack(), existing = new Set(state.items.map(item => item.bgmId).filter(Boolean));
+    const chosen = pack.items.slice(0,count).filter(item => !existing.has(item.subjectId));
+    if (state.items.length + chosen.length > 300) throw new Error('当前项目最多容纳 300 张图片（含垃圾桶），请改选较少的封面。');
+    const added = chosen.map(item => {
+      if (!Number.isSafeInteger(item.subjectId) || item.subjectId <= 0 || typeof item.name !== 'string' || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('素材包数据无效');
+      return {id:crypto.randomUUID(), name:item.name.slice(0,60), src:item.src, bgmId:item.subjectId, coverSource:item.coverSource, coverSourceUrl:item.coverSourceUrl, coverNote:item.coverNote || ''};
+    });
+    // Read the current board after loading, so edits during the download are retained.
+    if (added.length) { snapshot(); const empty = state.items.length === 0; state.items.push(...added); state.order.pool.push(...added.map(item => item.id)); if (empty) state.title = `Galgame 夯到拉 · Bangumi 前 ${count}`; commit(); }
+    const message = `已加入 ${added.length} 张封面，跳过 ${count-added.length} 个已有或已丢弃条目。`;
+    $('presetStatus').textContent = message; toast(message); $('materialsDialog').close();
+  } catch (error) { $('presetStatus').textContent = error.message; toast(error.message); }
+  finally { importing = false; $('uploadBtn').disabled = false; document.querySelectorAll('[data-preset]').forEach(button => button.disabled = false); }
+}
+$('materialsBtn').onclick = () => $('materialsDialog').showModal();
+document.querySelectorAll('[data-preset]').forEach(button => button.onclick = () => loadPreset(Number(button.dataset.preset)));
+$('trashTarget').onclick = () => { if (Date.now() > ignoreClickUntil) { renderTrash(); $('trashDialog').showModal(); } };
+$('restoreAllTrash').onclick = () => { if (!state.order.trash.length) return; snapshot(); state.order.pool.push(...state.order.trash); state.order.trash = []; commit(); toast('垃圾桶图片已恢复到待排名。'); };
 async function imageFromFile(file) {
   if (!/^image\/(png|jpeg|webp|gif|avif)$/.test(file.type)) throw new Error('不支持该图片格式');
   if (file.size > 20 * 1024 * 1024) throw new Error('单张图片超过 20 MB');
@@ -118,7 +170,7 @@ function addDemo() {
   state.title = '今天吃什么？美食夯到拉'; commit(); toast('示例已就位，试着把图片拖到上方分级。');
 }
 function clearDrag() {
-  if (drag?.ghost) drag.ghost.remove(); document.querySelectorAll('.drag-source,.over,.insert-before,.insert-after').forEach(el => el.classList.remove('drag-source','over','insert-before','insert-after')); drag = null;
+  document.body.classList.remove('dragging-item'); if (drag?.ghost) drag.ghost.remove(); document.querySelectorAll('.drag-source,.over,.insert-before,.insert-after').forEach(el => el.classList.remove('drag-source','over','insert-before','insert-after')); drag = null;
 }
 document.addEventListener('pointerdown', event => {
   const tileEl = event.target.closest('.tile'); if (!tileEl || event.button !== 0) return;
@@ -129,13 +181,13 @@ document.addEventListener('pointermove', event => {
   if (!drag || event.pointerId !== drag.pointer) return;
   if (!drag.active && Math.hypot(event.clientX-drag.x,event.clientY-drag.y) < 6) return;
   event.preventDefault();
-  if (!drag.active) { drag.active = true; drag.ghost = drag.el.cloneNode(true); drag.ghost.classList.add('drag-ghost'); drag.ghost.removeAttribute('data-item'); document.body.append(drag.ghost); drag.el.classList.add('drag-source'); }
+  if (!drag.active) { drag.active = true; drag.ghost = drag.el.cloneNode(true); drag.ghost.classList.add('drag-ghost'); drag.ghost.removeAttribute('data-item'); document.body.append(drag.ghost); drag.el.classList.add('drag-source'); document.body.classList.add('dragging-item'); }
   drag.ghost.style.left = `${event.clientX - 35}px`; drag.ghost.style.top = `${event.clientY - 35}px`;
   document.querySelectorAll('.over,.insert-before,.insert-after').forEach(el => el.classList.remove('over','insert-before','insert-after'));
   const target = document.elementFromPoint(event.clientX,event.clientY), zone = target?.closest('.dropzone'); drag.zone = zone?.dataset.zone; drag.before = null;
   if (zone) {
     zone.classList.add('over'); const tileEl = target.closest('.tile');
-    if (tileEl && tileEl.dataset.item !== drag.id) { const rect = tileEl.getBoundingClientRect(), after = event.clientX > rect.left + rect.width / 2; const ids = state.order[drag.zone].filter(id => id !== drag.id); drag.before = after ? ids[ids.indexOf(tileEl.dataset.item)+1] || null : tileEl.dataset.item; tileEl.classList.add(after ? 'insert-after' : 'insert-before'); }
+    if (drag.zone !== 'trash' && tileEl && tileEl.dataset.item !== drag.id) { const rect = tileEl.getBoundingClientRect(), after = event.clientX > rect.left + rect.width / 2; const ids = state.order[drag.zone].filter(id => id !== drag.id); drag.before = after ? ids[ids.indexOf(tileEl.dataset.item)+1] || null : tileEl.dataset.item; tileEl.classList.add(after ? 'insert-after' : 'insert-before'); }
     else if (tileEl?.dataset.item === drag.id) drag.before = drag.id;
   }
   if (event.clientY > innerHeight-55) window.scrollBy(0,16); else if (event.clientY < 75) window.scrollBy(0,-16);
@@ -188,9 +240,9 @@ function validateProject(data) {
   if (!data || data.version !== 1 || typeof data.title !== 'string' || data.title.length > 50 || !Array.isArray(data.tiers) || data.tiers.length !== 5 || !Array.isArray(data.items) || data.items.length > 300 || !data.order || typeof data.order !== 'object') throw new Error('项目格式无效');
   const tiers = data.tiers.map((tier,index) => { if (tier.id !== `t${index}` || typeof tier.name !== 'string' || !tier.name.trim() || tier.name.length > 12 || !/^#[0-9a-f]{6}$/i.test(tier.color)) throw new Error('分级无效'); return {id:tier.id,name:tier.name,color:tier.color}; });
   const ids = new Set();
-  const items = data.items.map(item => { if (!item || typeof item.id !== 'string' || item.id.length > 100 || ids.has(item.id) || typeof item.name !== 'string' || item.name.length > 60 || typeof item.src !== 'string' || item.src.length > 4*1024*1024 || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('图片数据无效'); ids.add(item.id); return {id:item.id,name:item.name,src:item.src}; });
+  const items = data.items.map(item => { if (!item || typeof item.id !== 'string' || item.id.length > 100 || ids.has(item.id) || typeof item.name !== 'string' || item.name.length > 60 || typeof item.src !== 'string' || item.src.length > 4*1024*1024 || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('图片数据无效'); ids.add(item.id); const result = {id:item.id,name:item.name,src:item.src}; if (Number.isSafeInteger(item.bgmId) && item.bgmId > 0) { result.bgmId = item.bgmId; if (typeof item.coverSource === 'string') result.coverSource = item.coverSource.slice(0,60); if (typeof item.coverNote === 'string') result.coverNote = item.coverNote.slice(0,120); if (typeof item.coverSourceUrl === 'string' && /^https:\/\//.test(item.coverSourceUrl) && item.coverSourceUrl.length < 1000) result.coverSourceUrl = item.coverSourceUrl; } return result; });
   const used = new Set(), order = {};
-  for (const key of [...tiers.map(t => t.id),'pool']) { const list = data.order[key]; if (!Array.isArray(list)) throw new Error('排序无效'); order[key] = list.map(id => { if (!ids.has(id) || used.has(id)) throw new Error('图片排序重复或丢失'); used.add(id); return id; }); }
+  for (const key of [...tiers.map(t => t.id),'pool','trash']) { const list = key === 'trash' && !Object.hasOwn(data.order,'trash') ? [] : data.order[key]; if (!Array.isArray(list)) throw new Error('排序无效'); order[key] = list.map(id => { if (!ids.has(id) || used.has(id)) throw new Error('图片排序重复或丢失'); used.add(id); return id; }); }
   if (used.size !== ids.size) throw new Error('图片排序不完整');
   return {version:1,background:data.background === 'black' ? 'black' : 'white',displayNames:data.displayNames === true,title:data.title,tiers,items,order};
 }
@@ -248,7 +300,7 @@ $('uploadBtn').onclick = () => $('imageInput').click(); $('imageInput').onchange
 $('boardTitle').onchange = e => { snapshot(); state.title = e.target.value.trim() || '我的夯到拉排行榜'; commit(); };
 $('itemName').onchange = e => { const item = itemById(selected); if (item) { snapshot(); item.name = e.target.value.trim() || '未命名图片'; commit(); } };
 $('moveBtn').onclick = () => move(selected,$('moveTarget').value); $('leftBtn').onclick = () => shiftSelected(-1); $('rightBtn').onclick = () => shiftSelected(1);
-$('deleteBtn').onclick = () => { if (!itemById(selected)) return; snapshot(); state.items = state.items.filter(i => i.id !== selected); for (const key in state.order) state.order[key] = state.order[key].filter(id => id !== selected); selected = null; commit(); toast('图片已移除，可点击撤销恢复。'); };
+$('deleteBtn').onclick = () => move(selected,'trash');
 $('undoBtn').onclick = () => { if (!history.length) return; state = history.pop(); selected = null; commit(); toast('已撤销上一步'); };
 $('resetBtn').onclick = () => { if (!state.items.length) return; snapshot(); state.order.pool = [...state.tiers.flatMap(t => state.order[t.id]),...state.order.pool]; state.tiers.forEach(t => state.order[t.id] = []); commit(); toast('已全部移回待排名，可撤销。'); };
 $('backupBtn').onclick = () => { download(new Blob([JSON.stringify(state)],{type:'application/json'}),filename('json')); toast('项目已导出，包含图片和排名。'); };
