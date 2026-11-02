@@ -190,7 +190,14 @@ document.addEventListener('pointermove', event => {
     if (drag.zone !== 'trash' && tileEl && tileEl.dataset.item !== drag.id) { const rect = tileEl.getBoundingClientRect(), after = event.clientX > rect.left + rect.width / 2; const ids = state.order[drag.zone].filter(id => id !== drag.id); drag.before = after ? ids[ids.indexOf(tileEl.dataset.item)+1] || null : tileEl.dataset.item; tileEl.classList.add(after ? 'insert-after' : 'insert-before'); }
     else if (tileEl?.dataset.item === drag.id) drag.before = drag.id;
   }
-  if (event.clientY > innerHeight-55) window.scrollBy(0,16); else if (event.clientY < 75) window.scrollBy(0,-16);
+  // Keep the bin and its approach area still; only the board's viewport edges scroll.
+  const bin = $('trashTarget').getBoundingClientRect(), board = $('board').getBoundingClientRect();
+  const nearBin = event.clientX >= bin.left-48 && event.clientX <= bin.right+48 && event.clientY >= bin.top-48 && event.clientY <= bin.bottom+48;
+  const overBoardWidth = event.clientX >= board.left && event.clientX <= board.right;
+  if (drag.zone !== 'trash' && !nearBin && overBoardWidth) {
+    if (event.clientY > innerHeight-32) window.scrollBy(0,16);
+    else if (event.clientY < 32) window.scrollBy(0,-16);
+  }
 },{passive:false});
 document.addEventListener('pointerup', event => {
   if (!drag || event.pointerId !== drag.pointer) return;
