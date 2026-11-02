@@ -1,12 +1,14 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const defaults = () => ({version: 1, title: '我的夯到拉排行榜', tiers: [
-  {id:'t0',name:'夯',color:'#ff7979'}, {id:'t1',name:'顶级',color:'#ffb276'},
-  {id:'t2',name:'人上人',color:'#ffe18a'}, {id:'t3',name:'NPC',color:'#9fdbad'}, {id:'t4',name:'拉',color:'#8db9e8'}
+const classicColors = ['#ff0000','#ff9900','#ffff00','#ffffcc','#ffffff'];
+const oldColors = ['#ff7979','#ffb276','#ffe18a','#9fdbad','#8db9e8'];
+const defaults = () => ({version: 1, displayNames: false, title: '我的夯到拉排行榜', tiers: [
+  {id:'t0',name:'夯',color:classicColors[0]}, {id:'t1',name:'顶级',color:classicColors[1]},
+  {id:'t2',name:'人上人',color:classicColors[2]}, {id:'t3',name:'NPC',color:classicColors[3]}, {id:'t4',name:'拉',color:classicColors[4]}
 ], items: [], order: {t0:[],t1:[],t2:[],t3:[],t4:[],pool:[]}});
 let state = defaults(), selected = null, history = [], db, saveChain = Promise.resolve(), revision = 0, savedRevision = 0, importing = false;
 let toastTimer, drag = null, ignoreClickUntil = 0, recordMode = 'screen', recordFiles = 0;
-const codes = ['S','A','B','C','D'];
+
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 4200); }
 function saveStatus(text, error = false) { $('saveStatus').textContent = text; $('saveStatus').classList.toggle('error', error); }
 function snapshot() {
@@ -39,20 +41,21 @@ function fillZone(zone, ids, hint) {
 }
 function render() {
   $('boardTitle').value = state.title; $('board').replaceChildren();
+  document.body.classList.toggle('show-names', !!state.displayNames); $('namesToggle').checked = !!state.displayNames;
   state.tiers.forEach((tier, index) => {
     const row = document.createElement('div'); row.className = 'tier';
     const label = document.createElement('div'); label.className = 'tier-label'; label.style.background = tier.color;
     const name = document.createElement('span'); name.textContent = tier.name;
-    const sub = document.createElement('small'); sub.textContent = `${codes[index]} TIER`; label.append(name, sub);
+    label.append(name);
     const zone = document.createElement('div'); zone.className = 'dropzone'; zone.dataset.zone = tier.id; zone.setAttribute('aria-label', `${tier.name}分级`);
-    fillZone(zone,state.order[tier.id], '把你的选择拖到这里'); row.append(label,zone); $('board').append(row);
+    fillZone(zone,state.order[tier.id]); row.append(label,zone); $('board').append(row);
   });
   $('pool').replaceChildren(); fillZone($('pool'),state.order.pool);
   if (!state.order.pool.length) {
     const empty = document.createElement('div'); empty.className = 'empty-pool';
-    const title = document.createElement('b'); title.textContent = state.items.length ? '全员就位，排名完成。' : '把图片拖到这里，开启你的榜单';
+    const title = document.createElement('b'); title.textContent = state.items.length ? '所有图片已排名' : '上传图片，或拖入图片文件';
     const sub = document.createElement('small'); sub.textContent = '支持批量上传 / 粘贴截图 · JPG、PNG、WebP、GIF、AVIF'; empty.append(title,sub);
-    if (!state.items.length) { const demo = document.createElement('button'); demo.textContent = '先用示例体验一下 →'; demo.onclick = addDemo; empty.append(document.createElement('br'),demo); }
+    if (!state.items.length) { const demo = document.createElement('button'); demo.textContent = '载入示例'; demo.onclick = addDemo; empty.append(document.createElement('br'),demo); }
     $('pool').append(empty);
   }
   $('poolCount').textContent = state.order.pool.length;
@@ -60,9 +63,9 @@ function render() {
   $('undoBtn').disabled = !history.length; renderPreview();
 }
 function renderPreview() {
-  const item = itemById(selected); $('itemTools').hidden = !item;
+  const item = itemById(selected); $('itemTools').hidden = !item; document.querySelector('.preview-panel').hidden = !item;
   document.querySelectorAll('.tile').forEach(el => el.classList.toggle('selected',el.dataset.item === selected));
-  if (!item) { $('preview').innerHTML = '<div class="preview-empty"><span>◎</span><p>点一张图片<br><small>放大看看，再做决定</small></p></div>'; return; }
+  if (!item) { $('preview').innerHTML = '<p class="small">点击图片预览</p>'; return; }
   const img = new Image(); img.src = item.src; img.alt = item.name; $('preview').replaceChildren(img); $('itemName').value = item.name;
   $('moveTarget').replaceChildren();
   [...state.tiers,{id:'pool',name:'待排名'}].forEach(t => { const option = new Option(t.name,t.id); $('moveTarget').add(option); });
@@ -155,21 +158,23 @@ async function exportImage() {
   try {
     const boardState = structuredClone(state), images = new Map();
     await Promise.all(boardState.items.map(async item => { const image = new Image(); image.src = item.src; await image.decode(); images.set(item.id,image); }));
-    const width = 1600, pad = 48, labelWidth = 150, size = 120, gap = 12, columns = Math.floor((width-pad*2-labelWidth-gap)/(size+gap));
-    const rows = [...boardState.tiers]; if (boardState.order.pool.length) rows.push({id:'pool',name:'待排名',color:'#abb3be'});
-    const heights = rows.map(t => Math.max(1,Math.ceil(boardState.order[t.id].length/columns))*(size+gap)+gap);
-    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = 188 + heights.reduce((a,b) => a+b,0)+pad;
-    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#111419'; ctx.fillRect(0,0,width,canvas.height);
-    ctx.fillStyle = '#d2f76b'; ctx.font = 'bold 20px "Microsoft YaHei", sans-serif'; ctx.fillText('夯到拉 / YOUR TASTE. YOUR TIERS.',pad,48);
-    ctx.fillStyle = '#eef0f3'; ctx.font = 'bold 40px "Microsoft YaHei", sans-serif'; fitText(ctx,boardState.title,pad,112,width-pad*2);
-    let y = 160;
+    const width = 1600, pad = 24, labelWidth = 180, size = 128, line = 2, columns = Math.floor((width-pad*2-labelWidth-line*2)/size);
+    const rows = [...boardState.tiers]; if (boardState.order.pool.length) rows.push({id:'pool',name:'待排名',color:'#ffffff'});
+    const heights = rows.map(t => Math.max(1,Math.ceil(boardState.order[t.id].length/columns))*size+line);
+    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = 98 + heights.reduce((a,b) => a+b,0)+pad;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,width,canvas.height);
+    ctx.fillStyle = '#111111'; ctx.font = 'bold 36px "Microsoft YaHei",sans-serif'; fitText(ctx,boardState.title,pad,58,width-pad*2);
+    let y = 96;
+    ctx.fillRect(pad,y-line,width-pad*2,line);
     rows.forEach((tier,rowIndex) => {
-      const height = heights[rowIndex]; ctx.fillStyle = '#20252e'; ctx.fillRect(pad,y,width-pad*2,height-2); ctx.fillStyle = tier.color; ctx.fillRect(pad,y,labelWidth,height-2);
-      ctx.fillStyle = '#171b21'; ctx.font = 'bold 28px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; fitText(ctx,tier.name,pad+labelWidth/2,y+height/2+10,labelWidth-20); ctx.textAlign = 'left';
+      const height = heights[rowIndex];
+      ctx.fillStyle = tier.color; ctx.fillRect(pad+line,y,labelWidth-line,height-line);
+      ctx.fillStyle = '#111111'; ctx.fillRect(pad,y,line,height); ctx.fillRect(pad+labelWidth,y,line,height); ctx.fillRect(width-pad-line,y,line,height); ctx.fillRect(pad,y+height-line,width-pad*2,line);
+      ctx.font = 'bold 38px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; fitText(ctx,tier.name,pad+labelWidth/2,y+(height-line)/2+14,labelWidth-20); ctx.textAlign = 'left';
       boardState.order[tier.id].forEach((id,index) => {
-        const img = images.get(id), item = boardState.items.find(i => i.id === id), x = pad+labelWidth+gap+(index%columns)*(size+gap), iy = y+gap+Math.floor(index/columns)*(size+gap);
-        ctx.fillStyle = '#12161c'; ctx.fillRect(x,iy,size,size); const scale = Math.min(size/img.naturalWidth,size/img.naturalHeight); const w = img.naturalWidth*scale,h = img.naturalHeight*scale; ctx.drawImage(img,x+(size-w)/2,iy+(size-h)/2,w,h);
-        ctx.fillStyle = '#000b'; ctx.fillRect(x,iy+size-25,size,25); ctx.fillStyle = '#fff'; ctx.font = '14px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; fitText(ctx,item.name,x+size/2,iy+size-8,size-10); ctx.textAlign = 'left';
+        const img = images.get(id), item = boardState.items.find(i => i.id === id), x = pad+labelWidth+line+(index%columns)*size, iy = y+Math.floor(index/columns)*size;
+        const scale = Math.min(size/img.naturalWidth,size/img.naturalHeight); const w = img.naturalWidth*scale,h = img.naturalHeight*scale; ctx.drawImage(img,x+(size-w)/2,iy+(size-h)/2,w,h);
+        if (boardState.displayNames) { ctx.fillStyle = '#000b'; ctx.fillRect(x,iy+size-25,size,25); ctx.fillStyle = '#fff'; ctx.font = '14px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; fitText(ctx,item.name,x+size/2,iy+size-8,size-10); ctx.textAlign = 'left'; }
       }); y += height;
     });
     const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png')); if (!blob) throw new Error('图片过大'); download(blob,filename('png')); toast('高清 PNG 已导出，包含未排名图片。');
@@ -183,7 +188,7 @@ function validateProject(data) {
   const used = new Set(), order = {};
   for (const key of [...tiers.map(t => t.id),'pool']) { const list = data.order[key]; if (!Array.isArray(list)) throw new Error('排序无效'); order[key] = list.map(id => { if (!ids.has(id) || used.has(id)) throw new Error('图片排序重复或丢失'); used.add(id); return id; }); }
   if (used.size !== ids.size) throw new Error('图片排序不完整');
-  return {version:1,title:data.title,tiers,items,order};
+  return {version:1,displayNames:data.displayNames === true,title:data.title,tiers,items,order};
 }
 async function restoreProject(file) {
   if (!file || importing) return;
@@ -205,9 +210,9 @@ const recorder = new LocalRecorder(phase => {
   $('startRecord').textContent = phase === 'starting' ? '正在等待授权…' : recordMode === 'screen' ? '● 开始录屏' : '● 开始录音';
   document.querySelector('.record-controls').hidden = !active; $('focusStop').hidden = !active;
   $('pauseRecord').textContent = phase === 'paused' ? '▶ 继续' : 'Ⅱ 暂停';
-  document.querySelector('.recording-panel').classList.toggle('recording',!idle);
+  document.querySelector('.recording-panel').classList.toggle('recording',!idle); $('recordToggle').classList.toggle('is-recording',!idle);
   const source = [recorder.hasMic ? '麦克风' : '', recorder.hasSystem ? '屏幕声音' : ''].filter(Boolean).join(' + ') || '无声音';
-  $('recordStatus').textContent = {idle: recordFiles ? '录制完成，请在下方下载' : '准备好，开始你的锐评',starting:'请完成浏览器授权',recording:`录制中 · ${source}`,paused:'已暂停 · 点击继续恢复',stopping:'正在生成录制文件…'}[phase];
+  $('recordStatus').textContent = {idle: recordFiles ? '录制完成，请在下方下载' : '未开始录制',starting:'请完成浏览器授权',recording:`录制中 · ${source}`,paused:'已暂停 · 点击继续恢复',stopping:'正在生成录制文件…'}[phase];
 }, (blob,mode,duration) => {
   recordFiles++;
   const url = URL.createObjectURL(blob), file = document.createElement('div'); file.className = 'recording-file';
@@ -216,9 +221,9 @@ const recorder = new LocalRecorder(phase => {
   const ext = blob.type.includes('mp4') ? (mode === 'audio' ? 'm4a' : 'mp4') : 'webm';
   const a = document.createElement('a'); a.href = url; a.download = filename(ext); a.textContent = `↓ 下载${mode === 'audio' ? '录音' : '录屏'}（${ext.toUpperCase()}）`;
   file.append(label,media,a); $('recordings').prepend(file); $('recordStatus').textContent = '录制完成，请在下方下载';
-  focusMode(false); toast('录制已完成，文件已生成，请下载保存。');
+  focusMode(false); setRecordPanel(true); toast('录制已完成，文件已生成，请下载保存。');
 }, message => { $('recordStatus').textContent = message; toast(message); });
-setInterval(() => { const text = formatTime(recorder.duration()); $('recordTimer').textContent = text; $('focusTimer').textContent = ['recording','paused'].includes(recorder.phase) ? `${recorder.phase === 'paused' ? 'Ⅱ' : '●'} ${text}` : ''; },250);
+setInterval(() => { const text = formatTime(recorder.duration()); $('recordToggle').textContent = ['recording','paused'].includes(recorder.phase) ? `${recorder.phase === 'paused' ? '已暂停' : '录制中'} ${text}` : '录音 / 录屏'; $('recordTimer').textContent = text; $('focusTimer').textContent = ['recording','paused'].includes(recorder.phase) ? `${recorder.phase === 'paused' ? 'Ⅱ' : '●'} ${text}` : ''; },250);
 function setMode(mode) {
   if (recorder.phase !== 'idle') return; recordMode = mode;
   ['screen','audio'].forEach(m => { $(`${m}Mode`).classList.toggle('active',m === mode); $(`${m}Mode`).setAttribute('aria-pressed',String(m === mode)); });
@@ -226,6 +231,11 @@ function setMode(mode) {
   $('startRecord').textContent = mode === 'audio' ? '● 开始录音' : '● 开始录屏';
   $('recordHint').textContent = mode === 'audio' ? '只录制麦克风声音。开始时请允许浏览器访问麦克风。' : '选择要录制的标签页、窗口或屏幕。共享声音需在浏览器弹窗中勾选。';
 }
+function setRecordPanel(open) { $('recordPanel').hidden = !open; $('recordToggle').setAttribute('aria-expanded', String(open)); }
+$('recordToggle').onclick = () => setRecordPanel($('recordPanel').hidden);
+$('closeRecordPanel').onclick = () => setRecordPanel(false);
+$('closePreview').onclick = () => { selected = null; renderPreview(); };
+$('namesToggle').onchange = e => { snapshot(); state.displayNames = e.target.checked; commit(); };
 $('screenMode').onclick = () => setMode('screen'); $('audioMode').onclick = () => setMode('audio');
 $('startRecord').onclick = () => recorder.start(recordMode,$('micToggle').checked,$('systemToggle').checked);
 $('pauseRecord').onclick = () => recorder.pause(); $('stopRecord').onclick = $('focusStop').onclick = () => recorder.stop();
@@ -242,7 +252,7 @@ $('focusBtn').onclick = () => focusMode(true); $('exitFocus').onclick = () => fo
 $('helpBtn').onclick = () => $('helpDialog').showModal(); document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => $(button.dataset.close).close());
 $('editTiersBtn').onclick = () => {
   $('tierFields').replaceChildren();
-  state.tiers.forEach((tier,index) => { const row = document.createElement('div'); row.className = 'tier-field'; const code = document.createElement('span'); code.textContent = codes[index]; const color = document.createElement('input'); color.type = 'color'; color.value = tier.color; color.name = `color${index}`; color.setAttribute('aria-label',`${codes[index]}级颜色`); const name = document.createElement('input'); name.type = 'text'; name.value = tier.name; name.name = `name${index}`; name.maxLength = 12; name.required = true; name.setAttribute('aria-label',`${codes[index]}级名称`); row.append(code,color,name); $('tierFields').append(row); }); $('tiersDialog').showModal();
+  state.tiers.forEach((tier,index) => { const row = document.createElement('div'); row.className = 'tier-field'; const code = document.createElement('span'); code.textContent = index + 1; const color = document.createElement('input'); color.type = 'color'; color.value = tier.color; color.name = `color${index}`; color.setAttribute('aria-label',`第${index+1}栏颜色`); const name = document.createElement('input'); name.type = 'text'; name.value = tier.name; name.name = `name${index}`; name.maxLength = 12; name.required = true; name.setAttribute('aria-label',`第${index+1}栏名称`); row.append(code,color,name); $('tierFields').append(row); }); $('tiersDialog').showModal();
 };
 $('tiersForm').onsubmit = e => { e.preventDefault(); const form = new FormData(e.target); snapshot(); state.tiers.forEach((tier,index) => { tier.name = form.get(`name${index}`).trim() || tier.name; tier.color = form.get(`color${index}`); }); $('tiersDialog').close(); commit(); };
 document.addEventListener('keydown',e => { if (e.key === 'Escape') { clearDrag(); focusMode(false); } if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); $('undoBtn').click(); } });
@@ -251,7 +261,11 @@ async function init() {
   try {
     db = await new Promise((resolve,reject) => { const request = indexedDB.open('hang-to-la-local',1); request.onupgradeneeded = () => request.result.createObjectStore('boards'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
     const existing = await new Promise((resolve,reject) => { const request = db.transaction('boards').objectStore('boards').get('current'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
-    if (existing) state = validateProject(existing); saveStatus('已自动保存到本机');
+    saveStatus('已自动保存到本机');
+    if (existing) {
+      state = validateProject(existing);
+      if (state.tiers.every((tier,index) => tier.color.toLowerCase() === oldColors[index])) { state.tiers.forEach((tier,index) => tier.color = classicColors[index]); save(); }
+    }
   } catch { saveStatus('存档不可用，请保存项目备份',true); }
   render();
 }
