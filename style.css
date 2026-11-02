@@ -17,3 +17,5 @@ body.dark #board,body.dark .tier,body.dark .tier-label{border-color:#777}body.da
 .cover-note{display:block;margin-top:6px}
 
 #itemTools{min-width:0;overflow-wrap:anywhere}
+
+.preset-source-label{display:flex;align-items:center;gap:12px;margin-bottom:14px}.preset-source-label select{flex:1}

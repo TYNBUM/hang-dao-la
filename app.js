@@ -73,8 +73,12 @@ function renderPreview() {
   document.querySelectorAll('.tile').forEach(el => el.classList.toggle('selected',el.dataset.item === selected));
   if (!item) { $('preview').innerHTML = '<p class="small">点击图片预览</p>'; return; }
   const img = new Image(); img.src = item.src; img.alt = item.name; $('preview').replaceChildren(img); $('itemName').value = item.name;
-  $('itemSource').replaceChildren(); $('itemSource').hidden = !item.bgmId;
-  if (item.bgmId) { const link = document.createElement('a'); link.href = `https://bgm.tv/subject/${item.bgmId}`; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Bangumi 条目'; $('itemSource').append(link); if (item.coverSourceUrl) { const coverLink = document.createElement('a'); coverLink.href = item.coverSourceUrl; coverLink.target = '_blank'; coverLink.rel = 'noopener noreferrer'; coverLink.textContent = `封面来源：${item.coverSource || '公开页面'}`; $('itemSource').append(' · ', coverLink); } }
+  $('itemSource').replaceChildren(); $('itemSource').hidden = !item.bgmId && !item.rankingUrl;
+  const subjectUrl = item.rankingUrl || (item.bgmId ? `https://bgm.tv/subject/${item.bgmId}` : null);
+  if (subjectUrl) {
+    const link = document.createElement('a'); link.href = subjectUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = `${item.rankingSource || 'Bangumi'} 条目`; $('itemSource').append(link);
+    if (item.coverSourceUrl) { const coverLink = document.createElement('a'); coverLink.href = item.coverSourceUrl; coverLink.target = '_blank'; coverLink.rel = 'noopener noreferrer'; coverLink.textContent = `图片来源：${item.coverSource || '公开页面'}`; $('itemSource').append(' · ', coverLink); }
+  }
   if (item.coverNote) { const note = document.createElement('span'); note.className = 'cover-note'; note.textContent = item.coverNote; $('itemSource').append(note); }
   $('moveTarget').replaceChildren();
   [...state.tiers,{id:'pool',name:'待排名'}].forEach(t => { const option = new Option(t.name,t.id); $('moveTarget').add(option); });
@@ -102,38 +106,67 @@ function renderTrash() {
     row.append(img,name,button); $('trashList').append(row);
   });
 }
-let presetPromise;
-function getPresetPack() {
-  if (window.BANGUMI_GALGAME_PACK) return Promise.resolve(window.BANGUMI_GALGAME_PACK);
-  if (!presetPromise) presetPromise = new Promise((resolve,reject) => {
-    const script = document.createElement('script'); script.src = './bangumi-galgame.js?v=4';
-    script.onload = () => { if (window.BANGUMI_GALGAME_PACK?.items?.length === 100) resolve(window.BANGUMI_GALGAME_PACK); else { presetPromise = null; script.remove(); reject(new Error('素材包内容不完整')); } };
-    script.onerror = () => { presetPromise = null; script.remove(); reject(new Error('素材包加载失败，请稍后重试')); };
-    document.head.append(script);
-  });
-  return presetPromise;
+const presetSources = {
+  bangumi: {label:'Bangumi', global:'BANGUMI_GALGAME_PACK', url:'https://bgm.tv/game/tag/galgame/?sort=rank', rule:'Galgame 标签按排名排序，不同版本分别保留。'},
+  vndb: {label:'VNDB', global:'VNDB_GALGAME_PACK', url:'https://vndb.org/v?f=&s=34w', rule:'视觉小说按加权评分排序，包含乙女、BL 等类型。'},
+  egs: {label:'批评空间', global:'EGS_GALGAME_PACK', url:'https://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/toukei_median.php?count=100&year=1900', rule:'按中位数排序，至少 100 票，保留网站原顺序及不同发行版本。'}
+};
+const presetPromises = new Map();
+const validPresetRef = ref => typeof ref === 'string' && /^(bangumi:[1-9]\d*|vndb:v[1-9]\d*|egs:[1-9]\d*)$/.test(ref);
+function itemRefs(item) { return [...(item.presetRefs || []), ...(item.bgmId ? [`bangumi:${item.bgmId}`] : [])]; }
+function updatePresetSource() {
+  const config = presetSources[$('presetSource').value];
+  $('presetRule').textContent = `${config.rule} 快照：2026-11-02。`;
+  $('presetSourceLink').textContent = `查看 ${config.label} 原榜单`; $('presetSourceLink').href = config.url;
+  $('presetStatus').textContent = '追加到待排名区，保留已有排序。已加入或已丢弃的同一条目会跳过。';
 }
-async function loadPreset(count) {
-  if (![20,50,100].includes(count)) return;
+function getPresetPack(source) {
+  const config = presetSources[source];
+  if (window[config.global]) return Promise.resolve(window[config.global]);
+  if (!presetPromises.has(source)) {
+    const promise = new Promise((resolve,reject) => {
+      const script = document.createElement('script'); script.src = `./${source}-galgame.js?v=6`;
+      script.onload = () => { if (window[config.global]?.items?.length === 100) resolve(window[config.global]); else { script.remove(); reject(new Error('素材包内容不完整')); } };
+      script.onerror = () => { script.remove(); reject(new Error('素材包加载失败，请稍后重试')); };
+      document.head.append(script);
+    }).catch(error => { presetPromises.delete(source); throw error; });
+    presetPromises.set(source,promise);
+  }
+  return presetPromises.get(source);
+}
+async function loadPreset(count, source = $('presetSource').value) {
+  if (![20,50,100].includes(count) || !Object.hasOwn(presetSources,source)) return;
   if (importing) return toast('图片正在处理中，请稍候。');
-  importing = true; $('uploadBtn').disabled = true; document.querySelectorAll('[data-preset]').forEach(button => button.disabled = true);
+  importing = true; $('uploadBtn').disabled = true; $('presetSource').disabled = true; document.querySelectorAll('[data-preset]').forEach(button => button.disabled = true);
   $('presetStatus').textContent = '正在加载封面素材…';
   try {
-    const pack = await getPresetPack(), existing = new Set(state.items.map(item => item.bgmId).filter(Boolean));
-    const chosen = pack.items.slice(0,count).filter(item => !existing.has(item.subjectId));
+    const pack = await getPresetPack(source), existing = new Set(state.items.flatMap(itemRefs));
+    if (pack.id !== source || !Array.isArray(pack.items) || pack.items.length !== 100) throw new Error('素材包来源或内容无效');
+    const candidates = pack.items.slice(0,count).map(item => {
+      const ownRef = `${source}:${item.subjectId}`;
+      if (!validPresetRef(ownRef) || !Array.isArray(item.presetRefs) || !item.presetRefs.includes(ownRef) || item.presetRefs.length > 3 || !item.presetRefs.every(validPresetRef) || typeof item.name !== 'string' || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('素材包数据无效');
+      return item;
+    });
+    const chosen = candidates.filter(item => {
+      if (item.presetRefs.some(ref => existing.has(ref))) return false;
+      item.presetRefs.forEach(ref => existing.add(ref)); return true;
+    });
     if (state.items.length + chosen.length > 300) throw new Error('当前项目最多容纳 300 张图片（含垃圾桶），请改选较少的封面。');
     const added = chosen.map(item => {
-      if (!Number.isSafeInteger(item.subjectId) || item.subjectId <= 0 || typeof item.name !== 'string' || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('素材包数据无效');
-      return {id:crypto.randomUUID(), name:item.name.slice(0,60), src:item.src, bgmId:item.subjectId, coverSource:item.coverSource, coverSourceUrl:item.coverSourceUrl, coverNote:item.coverNote || ''};
+      const result = {id:crypto.randomUUID(), name:item.name.slice(0,60), src:item.src, presetRefs:[...item.presetRefs], rankingSource:presetSources[source].label, rankingUrl:item.subjectUrl, coverSource:item.coverSource, coverSourceUrl:item.coverSourceUrl, coverNote:item.coverNote || ''};
+      const bgmRef = item.presetRefs.find(ref => ref.startsWith('bangumi:'));
+      if (bgmRef) result.bgmId = Number(bgmRef.split(':')[1]);
+      return result;
     });
     // Read the current board after loading, so edits during the download are retained.
-    if (added.length) { snapshot(); const empty = state.items.length === 0; state.items.push(...added); state.order.pool.push(...added.map(item => item.id)); if (empty) state.title = `Galgame 夯到拉 · Bangumi 前 ${count}`; commit(); }
-    const message = `已加入 ${added.length} 张封面，跳过 ${count-added.length} 个已有或已丢弃条目。`;
+    if (added.length) { snapshot(); const empty = state.items.length === 0; state.items.push(...added); state.order.pool.push(...added.map(item => item.id)); if (empty) state.title = `Galgame 夯到拉 · ${presetSources[source].label} 前 ${count}`; commit(); }
+    const message = `已加入 ${added.length} 张图片，跳过 ${count-added.length} 个已有或已丢弃条目。`;
     $('presetStatus').textContent = message; toast(message); $('materialsDialog').close();
   } catch (error) { $('presetStatus').textContent = error.message; toast(error.message); }
-  finally { importing = false; $('uploadBtn').disabled = false; document.querySelectorAll('[data-preset]').forEach(button => button.disabled = false); }
+  finally { importing = false; $('uploadBtn').disabled = false; $('presetSource').disabled = false; document.querySelectorAll('[data-preset]').forEach(button => button.disabled = false); }
 }
-$('materialsBtn').onclick = () => $('materialsDialog').showModal();
+$('materialsBtn').onclick = () => { updatePresetSource(); $('materialsDialog').showModal(); };
+$('presetSource').onchange = updatePresetSource;
 document.querySelectorAll('[data-preset]').forEach(button => button.onclick = () => loadPreset(Number(button.dataset.preset)));
 $('trashTarget').onclick = () => { if (Date.now() > ignoreClickUntil) { renderTrash(); $('trashDialog').showModal(); } };
 $('restoreAllTrash').onclick = () => { if (!state.order.trash.length) return; snapshot(); state.order.pool.push(...state.order.trash); state.order.trash = []; commit(); toast('垃圾桶图片已恢复到待排名。'); };
@@ -247,7 +280,18 @@ function validateProject(data) {
   if (!data || data.version !== 1 || typeof data.title !== 'string' || data.title.length > 50 || !Array.isArray(data.tiers) || data.tiers.length !== 5 || !Array.isArray(data.items) || data.items.length > 300 || !data.order || typeof data.order !== 'object') throw new Error('项目格式无效');
   const tiers = data.tiers.map((tier,index) => { if (tier.id !== `t${index}` || typeof tier.name !== 'string' || !tier.name.trim() || tier.name.length > 12 || !/^#[0-9a-f]{6}$/i.test(tier.color)) throw new Error('分级无效'); return {id:tier.id,name:tier.name,color:tier.color}; });
   const ids = new Set();
-  const items = data.items.map(item => { if (!item || typeof item.id !== 'string' || item.id.length > 100 || ids.has(item.id) || typeof item.name !== 'string' || item.name.length > 60 || typeof item.src !== 'string' || item.src.length > 4*1024*1024 || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('图片数据无效'); ids.add(item.id); const result = {id:item.id,name:item.name,src:item.src}; if (Number.isSafeInteger(item.bgmId) && item.bgmId > 0) { result.bgmId = item.bgmId; if (typeof item.coverSource === 'string') result.coverSource = item.coverSource.slice(0,60); if (typeof item.coverNote === 'string') result.coverNote = item.coverNote.slice(0,120); if (typeof item.coverSourceUrl === 'string' && /^https:\/\//.test(item.coverSourceUrl) && item.coverSourceUrl.length < 1000) result.coverSourceUrl = item.coverSourceUrl; } return result; });
+  const items = data.items.map(item => {
+    if (!item || typeof item.id !== 'string' || item.id.length > 100 || ids.has(item.id) || typeof item.name !== 'string' || item.name.length > 60 || typeof item.src !== 'string' || item.src.length > 4*1024*1024 || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(item.src)) throw new Error('图片数据无效');
+    ids.add(item.id); const result = {id:item.id,name:item.name,src:item.src};
+    if (Number.isSafeInteger(item.bgmId) && item.bgmId > 0) result.bgmId = item.bgmId;
+    if (Array.isArray(item.presetRefs) && item.presetRefs.length <= 3 && item.presetRefs.every(validPresetRef)) result.presetRefs = [...new Set(item.presetRefs)];
+    for (const key of ['coverSource','rankingSource','coverNote']) if (typeof item[key] === 'string') result[key] = item[key].slice(0,key === 'coverNote' ? 120 : 60);
+    for (const key of ['coverSourceUrl','rankingUrl']) {
+      if (typeof item[key] !== 'string' || item[key].length >= 1000) continue;
+      try { const url = new URL(item[key]); if (url.protocol === 'https:' && !url.username && !url.password) result[key] = url.href; } catch { /* Ignore invalid optional source links. */ }
+    }
+    return result;
+  });
   const used = new Set(), order = {};
   for (const key of [...tiers.map(t => t.id),'pool','trash']) { const list = key === 'trash' && !Object.hasOwn(data.order,'trash') ? [] : data.order[key]; if (!Array.isArray(list)) throw new Error('排序无效'); order[key] = list.map(id => { if (!ids.has(id) || used.has(id)) throw new Error('图片排序重复或丢失'); used.add(id); return id; }); }
   if (used.size !== ids.size) throw new Error('图片排序不完整');

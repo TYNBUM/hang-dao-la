@@ -6,8 +6,8 @@
   <meta name="description" content="夯到拉图片排名，支持拖拽排序、自动保存、图片导出、录音和录屏。">
   <title>夯到拉排名</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ff7979'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44'%3E夯%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css?v=5">
-  <script src="./recorder.js" defer></script><script src="./app.js?v=5" defer></script>
+  <link rel="stylesheet" href="./style.css?v=6">
+  <script src="./recorder.js" defer></script><script src="./app.js?v=6" defer></script>
 </head>
 <body>
   <header class="topbar"><a class="brand" href="./">夯到拉排名</a><div class="top-actions"><span id="saveStatus" role="status" class="save-state">正在读取…</span><button id="helpBtn" class="quiet">使用说明</button></div></header>
@@ -39,7 +39,14 @@
   <div id="focusBar" hidden><span>夯到拉</span><span id="focusTimer"></span><button id="focusStop" hidden>■ 结束录制</button><button id="exitFocus">退出专注 Esc</button></div>
   <dialog id="tiersDialog"><div class="dialog-heading"><h2>修改栏目</h2><button data-close="tiersDialog" aria-label="关闭修改栏目">×</button></div><p class="muted">修改栏目名称和标签颜色。</p><form id="tiersForm"><div id="tierFields"></div><button class="primary wide" type="submit">保存分级</button></form></dialog>
   <dialog id="helpDialog"><div class="dialog-heading"><h2>使用说明</h2><button data-close="helpDialog" aria-label="关闭使用指南">×</button></div><ol class="help-list"><li><strong>添加素材</strong><p>点击上传，或把图片文件直接拖进页面；也支持粘贴截图。JPG、PNG、WebP、GIF、AVIF，单张不超过 20 MB。动图按静态帧导入。</p></li><li><strong>拖拽排名</strong><p>拖进任意栏位，再拖动调整前后顺序。也可点击图片，在“图片设置”选择分级，或用前移 / 后移按钮排序。</p></li><li><strong>导出或录制</strong><p>导出高清 PNG；录音使用麦克风，录屏可叠加解说。停止后在录制面板预览、下载文件。</p></li></ol><p class="small">录音录屏需要 HTTPS 或 localhost，建议在桌面 Chrome / Edge 打开。手机及部分内嵌浏览器不支持录屏。屏幕声音能否录入取决于浏览器和所选共享来源。</p><p class="small">榜单自动保存到当前浏览器；清理网站数据会删除存档。可用“保存项目”备份并跨设备恢复。录制文件仅在本次页面中保留，请下载后再关闭。长时间录制会占用内存，建议分段录制。</p></dialog>
-  <dialog id="materialsDialog"><div class="dialog-heading"><h2>Bangumi Galgame 封面</h2><button data-close="materialsDialog" aria-label="关闭封面素材">×</button></div><p class="small">按 Bangumi「Galgame」标签排名排序，榜单快照：2026-11-02。不同版本保留原榜单条目。</p><div class="preset-buttons"><button data-preset="20">加入前 20</button><button data-preset="50">加入前 50</button><button data-preset="100">加入前 100</button></div><p id="presetStatus" class="small" role="status">封面加入待排名区，保留当前排名；已有和已丢弃的条目会跳过。</p><p class="small source-note">排名来自 <a href="https://bgm.tv/game/tag/galgame/?sort=rank" target="_blank" rel="noopener noreferrer">Bangumi</a>。封面从 Bangumi、VNDB 及公开发行页面整理，少数条目使用其他发行版封面、标题或游戏画面，点击图片可查看具体说明与来源。图片版权归各作品权利人。</p></dialog>
+  <dialog id="materialsDialog"><div class="dialog-heading"><h2>Galgame 榜单素材</h2><button data-close="materialsDialog" aria-label="关闭榜单素材">×</button></div>
+    <label class="preset-source-label" for="presetSource">榜单来源 <select id="presetSource"><option value="bangumi">Bangumi</option><option value="vndb">VNDB</option><option value="egs">批评空间（EGS）</option></select></label>
+    <p id="presetRule" class="small">Galgame 标签按排名排序，不同版本分别保留。快照：2026-11-02。</p>
+    <div class="preset-buttons"><button data-preset="20">加入前 20</button><button data-preset="50">加入前 50</button><button data-preset="100">加入前 100</button></div>
+    <p id="presetStatus" class="small" role="status">追加到待排名区，保留已有排序。已加入或已丢弃的同一条目会跳过。</p>
+    <p class="small source-note"><a id="presetSourceLink" href="https://bgm.tv/game/tag/galgame/?sort=rank" target="_blank" rel="noopener noreferrer">查看 Bangumi 原榜单</a>。跨榜单仅合并能明确对应的条目，不同发行版本保留。</p>
+    <p class="small source-note">图片从各站公开页面整理，部分为其他发行版封面、标题或游戏画面；暂无可用配图的条目显示名称卡。点击图片可查看说明与来源，版权归各作品权利人。</p>
+  </dialog>
   <dialog id="trashDialog"><div class="dialog-heading"><h2>垃圾桶</h2><button data-close="trashDialog" aria-label="关闭垃圾桶">×</button></div><p class="small">不认识的图片可以直接拖进垃圾桶。这里的图片不参与排名和导出，随时可恢复。</p><button id="restoreAllTrash" class="trash-restore-all">全部恢复到待排名</button><div id="trashList" class="trash-list"></div></dialog>
   <div id="toast" role="status"></div><div id="fileOverlay" hidden>松手添加图片 <span>只在你的浏览器里处理</span></div>
 </body>

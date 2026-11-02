@@ -14,7 +14,7 @@
 - 图片详情固定在屏幕内，长内容在面板内滚动，拖动时暂时收起。
 - 垃圾桶固定在右侧，拖动时位置不变；靠近垃圾桶不触发页面滚动，仅靠近排名板上下屏幕边缘时自动滚动。
 - 图片预览、重命名、拖入垃圾桶、恢复、最近 20 步撤销；Ctrl / Command + Z。
-- 内置 Bangumi Galgame 前 20 / 50 / 100 图片包，可逐步追加，重复条目自动跳过。
+- 内置 Bangumi、VNDB、批评空间（EGS）三个榜单，各支持前 20 / 50 / 100；可逐步追加，明确对应的跨榜条目自动去重。
 - 垃圾桶里的图片不参与排名与导出；自动保存、项目备份和撤销都保留垃圾桶状态。
 - IndexedDB 自动保存图片与排名，刷新后恢复；JSON 项目备份与导入。
 - 导出 1600 像素宽 PNG，包含标题、五档排名和尚未排名的图片。
@@ -29,7 +29,7 @@
 4. Source 选择 **Deploy from a branch**，Branch 选择 **main**，目录选择 **/(root)**，点击 **Save**。
 5. 等待发布完成，在 Pages 页面打开显示的网址，通常为 `https://你的用户名.github.io/hang-dao-la/`。
 
-只需要 `index.html`、`style.css`、`app.js`、`recorder.js`、`bangumi-galgame.js` 和 `.nojekyll`。README 和 LICENSE 可以一起保留。使用相对资源路径，支持部署在仓库子路径。
+只需要 `index.html`、`style.css`、`app.js`、`recorder.js`、`bangumi-galgame.js`、`vndb-galgame.js`、`egs-galgame.js` 和 `.nojekyll`。README 和 LICENSE 可以一起保留。使用相对资源路径，支持部署在仓库子路径。
 
 官方文档：https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
 
@@ -77,18 +77,28 @@ index.html    页面结构与中文操作提示
 style.css     白底表格、移动端适配、专注模式
 app.js        排名、图片处理、IndexedDB、项目导入导出、PNG 导出
 recorder.js   浏览器媒体录制与资源释放
-bangumi-galgame.js  按需加载的榜单快照、图片数据与来源
+bangumi-galgame.js  Bangumi 榜单快照、图片数据与来源
+vndb-galgame.js     VNDB 榜单快照、图片数据与来源
+egs-galgame.js      批评空间榜单快照、图片数据与来源
 .nojekyll     GitHub Pages 静态文件标记
 ```
 
-## Bangumi 图片包
+## 三站榜单图片包
 
-点击工具栏“Galgame 封面”，选择前 20、50 或 100。图片追加到待排名区，不会覆盖已有排序；已经加入或扔进垃圾桶的条目会跳过。误扔时，点击垃圾桶可以单独恢复或全部恢复。
+点击“Galgame 封面”，先选榜单来源，再选择前 20、50 或 100。图片追加到待排名区，不覆盖已有排序；已经加入或扔进垃圾桶的同一条目会跳过。误扔时，点击垃圾桶可以恢复。
 
-榜单来自 [Bangumi Galgame 标签按排名排序](https://bgm.tv/game/tag/galgame/?sort=rank)，快照日期为 **2026-11-02**，不是实时更新，也不是全体游戏总榜。不同发行版本按原榜单分别保留。
+三站快照日期均为 **2026-11-02**，不实时更新，各自口径如下：
 
-100 个条目均提供本地图片，来源为 Bangumi、[VNDB](https://vndb.org/) 和 Steam 公开页面。少数使用其他发行版封面；《天鹅之歌》使用标题画面，《乐园》和原版《YU-NO》使用游戏画面。点选图片可查看 Bangumi 条目、图片来源及替代图片说明。素材数据内保留原名、Bangumi 总榜名次和来源地址。
+| 来源 | 排序口径 |
+| --- | --- |
+| [Bangumi](https://bgm.tv/game/tag/galgame/?sort=rank) | Galgame 标签按排名排序，不是全体游戏总榜。 |
+| [VNDB](https://vndb.org/v?f=&s=34w) | 视觉小说按加权评分降序，包含乙女、BL 等类型；数据来自官方公开 API。 |
+| [批评空间（EGS）](https://erogamescape.dyndns.org/~ap2/ero/toukei_kaiseki/toukei_median.php?count=100&year=1900) | 中位数排序，至少 100 票，1900 年以来；同分保持原站顺序。 |
 
-图片随网站打包，首次选择素材时才加载；不需要登录或令牌，不会在使用时请求第三方图片。之后排名、项目备份及 PNG 导出直接使用内嵌数据。
+每站保留原榜单前 100 个条目及不同发行版本。跨站仅通过明确对应的原名 / 官方名称建立关联，歧义条目不合并；不会把同一站的不同版本合成一个条目。旧存档的 Bangumi 编号也参与去重，用户改过的名称、排名及垃圾桶状态保留。
+
+图片来自 Bangumi、VNDB、Steam 和批评空间展示的公开资源。失效链接使用同作品其他发行版配图，部分采用标题或游戏画面，具体说明在图片详情里。VNDB 的 2 个条目暂无可用公开配图，保留名称卡占位，不删掉条目或挪动榜单名次。点选图片可查看对应站点条目和图片来源。
+
+素材包约每站 3–4 MB，选择时才加载相应文件。全部图片随网站打包，不需要登录、令牌或运行后端，使用时不请求第三方图片。之后排名、项目备份及 PNG 导出直接使用内嵌数据。
 
 代码采用 MIT 许可，可自由修改和部署。内置与用户导入的图片版权归各作品权利人，不属于 MIT 许可范围。
