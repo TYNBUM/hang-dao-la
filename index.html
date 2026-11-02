@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111419">
+  <meta name="description" content="自己的排名，自己说了算。中文夯到拉排名工具，图片拖拽、自动保存、高清导出、录音与录屏。">
+  <title>夯到拉 · 排名工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23d2f76b'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44'%3E夯%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./recorder.js" defer></script><script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./"><span class="brand-icon">夯</span><strong>夯到拉<span class="brand-sub">排名工作台</span></strong></a><div class="top-actions"><span id="saveStatus" role="status" class="save-state">正在读取本地存档…</span><button id="helpBtn" class="quiet">使用指南 ↗</button></div></header>
+  <main>
+    <div class="intro"><div><div class="eyebrow">YOUR TASTE. YOUR TIERS.</div><h1>万物皆可排，<span>你说了算。</span></h1><p>拖进一栏，亮出你的态度。今天，什么才是真的夯？</p></div><button id="focusBtn" class="outline">⛶ 专注模式</button></div>
+    <div class="workspace">
+      <section class="ranking" aria-label="排名工作区">
+        <div class="board-heading"><div><label class="eyebrow" for="boardTitle">本期榜单</label><input id="boardTitle" maxlength="50" value="我的夯到拉排行榜" aria-label="榜单标题"></div><span id="rankCount" class="counter">0 / 0 已排名</span></div>
+        <div class="toolbar"><div class="button-group"><button id="uploadBtn" class="primary">＋ 上传图片</button><button id="undoBtn" disabled title="Ctrl / ⌘ + Z">↶ 撤销</button><button id="editTiersBtn">自定义分级</button></div><button id="exportBtn" class="export">↓ 导出图片</button></div>
+        <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden>
+        <div id="board" aria-label="分级排名板"></div>
+        <div class="pool-heading"><h2>待排名 <span id="poolCount">0</span></h2><span>拖拽排序 · 点击图片可预览</span></div>
+        <div id="pool" class="dropzone pool" data-zone="pool" aria-label="待排名图片"></div>
+        <div class="bottom-tools"><span>图片仅保存在本机浏览器</span><div><button id="backupBtn" class="quiet">保存项目</button><button id="restoreBtn" class="quiet">打开项目</button><button id="resetBtn" class="quiet">全部移回待排名</button></div></div>
+        <input id="projectInput" type="file" accept=".json,application/json" hidden>
+      </section>
+      <aside>
+        <section class="panel recording-panel"><div class="panel-heading"><h2><span class="red-dot"></span> 创作录制</h2><span class="tag">本地录制</span></div>
+          <div class="record-tabs" role="group" aria-label="录制类型"><button id="screenMode" class="active" aria-pressed="true">▣ 录屏</button><button id="audioMode" aria-pressed="false">♩ 录音</button></div>
+          <div class="timer" id="recordTimer">00:00</div><div id="recordStatus" class="record-status" role="status">准备好，开始你的锐评</div>
+          <label class="check-row"><span>麦克风解说</span><input id="micToggle" type="checkbox" checked></label><label class="check-row" id="systemRow"><span>屏幕 / 标签页声音</span><input id="systemToggle" type="checkbox" checked></label>
+          <button id="startRecord" class="record-start">● 开始录屏</button><div class="record-controls" hidden><button id="pauseRecord">Ⅱ 暂停</button><button id="stopRecord" class="danger">■ 结束录制</button></div>
+          <p class="small" id="recordHint">选择要录制的标签页、窗口或屏幕。共享声音需在浏览器弹窗中勾选。</p>
+          <div id="recordings" class="recordings" aria-label="录制文件"></div>
+        </section>
+        <section class="panel preview-panel"><div class="panel-heading"><h2>当前主角</h2><span class="tag">PREVIEW</span></div><div id="preview" class="preview"><div class="preview-empty"><span>◎</span><p>点一张图片<br><small>放大看看，再做决定</small></p></div></div><div id="itemTools" hidden><label class="sr-only" for="itemName">图片名称</label><input id="itemName" maxlength="60" placeholder="给图片起个名字"><div class="move-row"><select id="moveTarget" aria-label="移动到分级"></select><button id="moveBtn">移入</button></div><div class="item-actions"><button id="leftBtn" title="在当前栏前移">← 前移</button><button id="rightBtn" title="在当前栏后移">后移 →</button><button id="deleteBtn" class="quiet danger">删除</button></div></div></section>
+        <div class="tip"><span>✦</span><p><strong>让观点占满画面</strong><br>开启专注模式，收起工具面板。<br>按 Esc 随时返回。</p></div>
+      </aside>
+    </div>
+    <footer><span>夯到拉 / MADE FOR YOUR OPINION</span><span>无需登录 · 无需上传到服务器</span></footer>
+  </main>
+  <div id="focusBar" hidden><span>夯到拉</span><span id="focusTimer"></span><button id="focusStop" hidden>■ 结束录制</button><button id="exitFocus">退出专注 Esc</button></div>
+  <dialog id="tiersDialog"><div class="dialog-heading"><h2>自定义分级</h2><button data-close="tiersDialog" aria-label="关闭自定义分级">×</button></div><p class="muted">改个名字，换个颜色，让榜单更有你的风格。</p><form id="tiersForm"><div id="tierFields"></div><button class="primary wide" type="submit">保存分级</button></form></dialog>
+  <dialog id="helpDialog"><div class="dialog-heading"><h2>三步，排出你的态度</h2><button data-close="helpDialog" aria-label="关闭使用指南">×</button></div><ol class="help-list"><li><strong>添加素材</strong><p>点击上传，或把图片文件直接拖进页面；也支持粘贴截图。JPG、PNG、WebP、GIF、AVIF，单张不超过 20 MB。动图按静态帧导入。</p></li><li><strong>拖拽排名</strong><p>拖进任意栏位，再拖动调整前后顺序。也可点击图片，在“当前主角”选择分级，或用前移 / 后移按钮排序。</p></li><li><strong>导出或录制</strong><p>导出高清 PNG；录音使用麦克风，录屏可叠加解说。停止后在录制面板预览、下载文件。</p></li></ol><p class="small">录音录屏需要 HTTPS 或 localhost，建议在桌面 Chrome / Edge 打开。手机及部分内嵌浏览器不支持录屏。屏幕声音能否录入取决于浏览器和所选共享来源。</p><p class="small">榜单自动保存到当前浏览器；清理网站数据会删除存档。可用“保存项目”备份并跨设备恢复。录制文件仅在本次页面中保留，请下载后再关闭。长时间录制会占用内存，建议分段录制。</p></dialog>
+  <div id="toast" role="status"></div><div id="fileOverlay" hidden>松手添加图片 <span>只在你的浏览器里处理</span></div>
+</body>
+</html>
