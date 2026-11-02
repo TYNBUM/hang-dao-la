@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const classicColors = ['#ff0000','#ff9900','#ffff00','#ffffcc','#ffffff'];
 const oldColors = ['#ff7979','#ffb276','#ffe18a','#9fdbad','#8db9e8'];
-const defaults = () => ({version: 1, displayNames: false, title: '我的夯到拉排行榜', tiers: [
+const defaults = () => ({version: 1, background: 'white', displayNames: false, title: '我的夯到拉排行榜', tiers: [
   {id:'t0',name:'夯',color:classicColors[0]}, {id:'t1',name:'顶级',color:classicColors[1]},
   {id:'t2',name:'人上人',color:classicColors[2]}, {id:'t3',name:'NPC',color:classicColors[3]}, {id:'t4',name:'拉',color:classicColors[4]}
 ], items: [], order: {t0:[],t1:[],t2:[],t3:[],t4:[],pool:[]}});
@@ -41,6 +41,9 @@ function fillZone(zone, ids, hint) {
 }
 function render() {
   $('boardTitle').value = state.title; $('board').replaceChildren();
+  const dark = state.background === 'black';
+  document.body.classList.toggle('dark', dark); document.documentElement.classList.toggle('dark', dark);
+  $('themeSelect').value = dark ? 'black' : 'white'; document.querySelector('meta[name="theme-color"]').content = dark ? '#111111' : '#ffffff';
   document.body.classList.toggle('show-names', !!state.displayNames); $('namesToggle').checked = !!state.displayNames;
   state.tiers.forEach((tier, index) => {
     const row = document.createElement('div'); row.className = 'tier';
@@ -162,15 +165,16 @@ async function exportImage() {
     const rows = [...boardState.tiers]; if (boardState.order.pool.length) rows.push({id:'pool',name:'待排名',color:'#ffffff'});
     const heights = rows.map(t => Math.max(1,Math.ceil(boardState.order[t.id].length/columns))*size+line);
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = 98 + heights.reduce((a,b) => a+b,0)+pad;
-    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,width,canvas.height);
-    ctx.fillStyle = '#111111'; ctx.font = 'bold 36px "Microsoft YaHei",sans-serif'; fitText(ctx,boardState.title,pad,58,width-pad*2);
+    const dark = boardState.background === 'black', lineColor = dark ? '#777777' : '#111111';
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = dark ? '#000000' : '#ffffff'; ctx.fillRect(0,0,width,canvas.height);
+    ctx.fillStyle = dark ? '#eeeeee' : '#111111'; ctx.font = 'bold 36px "Microsoft YaHei",sans-serif'; fitText(ctx,boardState.title,pad,58,width-pad*2);
     let y = 96;
-    ctx.fillRect(pad,y-line,width-pad*2,line);
+    ctx.fillStyle = lineColor; ctx.fillRect(pad,y-line,width-pad*2,line);
     rows.forEach((tier,rowIndex) => {
       const height = heights[rowIndex];
       ctx.fillStyle = tier.color; ctx.fillRect(pad+line,y,labelWidth-line,height-line);
-      ctx.fillStyle = '#111111'; ctx.fillRect(pad,y,line,height); ctx.fillRect(pad+labelWidth,y,line,height); ctx.fillRect(width-pad-line,y,line,height); ctx.fillRect(pad,y+height-line,width-pad*2,line);
-      ctx.font = 'bold 38px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; fitText(ctx,tier.name,pad+labelWidth/2,y+(height-line)/2+14,labelWidth-20); ctx.textAlign = 'left';
+      ctx.fillStyle = lineColor; ctx.fillRect(pad,y,line,height); ctx.fillRect(pad+labelWidth,y,line,height); ctx.fillRect(width-pad-line,y,line,height); ctx.fillRect(pad,y+height-line,width-pad*2,line);
+      ctx.fillStyle = '#111111'; ctx.font = 'bold 38px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'center'; fitText(ctx,tier.name,pad+labelWidth/2,y+(height-line)/2+14,labelWidth-20); ctx.textAlign = 'left';
       boardState.order[tier.id].forEach((id,index) => {
         const img = images.get(id), item = boardState.items.find(i => i.id === id), x = pad+labelWidth+line+(index%columns)*size, iy = y+Math.floor(index/columns)*size;
         const scale = Math.min(size/img.naturalWidth,size/img.naturalHeight); const w = img.naturalWidth*scale,h = img.naturalHeight*scale; ctx.drawImage(img,x+(size-w)/2,iy+(size-h)/2,w,h);
@@ -188,7 +192,7 @@ function validateProject(data) {
   const used = new Set(), order = {};
   for (const key of [...tiers.map(t => t.id),'pool']) { const list = data.order[key]; if (!Array.isArray(list)) throw new Error('排序无效'); order[key] = list.map(id => { if (!ids.has(id) || used.has(id)) throw new Error('图片排序重复或丢失'); used.add(id); return id; }); }
   if (used.size !== ids.size) throw new Error('图片排序不完整');
-  return {version:1,displayNames:data.displayNames === true,title:data.title,tiers,items,order};
+  return {version:1,background:data.background === 'black' ? 'black' : 'white',displayNames:data.displayNames === true,title:data.title,tiers,items,order};
 }
 async function restoreProject(file) {
   if (!file || importing) return;
@@ -235,6 +239,7 @@ function setRecordPanel(open) { $('recordPanel').hidden = !open; $('recordToggle
 $('recordToggle').onclick = () => setRecordPanel($('recordPanel').hidden);
 $('closeRecordPanel').onclick = () => setRecordPanel(false);
 $('closePreview').onclick = () => { selected = null; renderPreview(); };
+$('themeSelect').onchange = e => { snapshot(); state.background = e.target.value === 'black' ? 'black' : 'white'; commit(); };
 $('namesToggle').onchange = e => { snapshot(); state.displayNames = e.target.checked; commit(); };
 $('screenMode').onclick = () => setMode('screen'); $('audioMode').onclick = () => setMode('audio');
 $('startRecord').onclick = () => recorder.start(recordMode,$('micToggle').checked,$('systemToggle').checked);
