@@ -30,11 +30,17 @@ function save() {
 function commit() { render(); save(); }
 function itemById(id) { return state.items.find(i => i.id === id); }
 function tile(item) {
-  const button = document.createElement('button'); button.className = 'tile'; button.dataset.item = item.id;
-  button.title = item.name;
-  button.setAttribute('aria-label', `选择图片：${item.name}`); button.classList.toggle('selected', selected === item.id);
+  const card = document.createElement('div'); card.className = 'tile'; card.dataset.item = item.id; card.title = item.name;
+  card.classList.toggle('selected', selected === item.id);
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'tile-select';
+  button.setAttribute('aria-label', `选择图片：${item.name}`);
   const img = new Image(); img.src = item.src; img.alt = item.name; img.draggable = false;
-  const label = document.createElement('span'); label.textContent = item.name; button.append(img, label); return button;
+  const label = document.createElement('span'); label.textContent = item.name; button.append(img,label);
+  const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'tile-remove'; remove.textContent = '×';
+  remove.title = '移入垃圾桶'; remove.setAttribute('aria-label', `删除图片：${item.name}`);
+  remove.onpointerdown = event => event.stopPropagation();
+  remove.onclick = event => { event.stopPropagation(); if (!drag?.active && Date.now() > ignoreClickUntil) move(item.id,'trash'); };
+  card.append(button,remove); return card;
 }
 function fillZone(zone, ids, hint) {
   ids.forEach(id => { const item = itemById(id); if (item) zone.append(tile(item)); });
@@ -66,7 +72,7 @@ function render() {
   const activeCount = state.items.length - state.order.trash.length;
   $('rankCount').textContent = `${activeCount - state.order.pool.length} / ${activeCount} 已排名`;
   $('trashCount').textContent = state.order.trash.length; renderTrash();
-  $('undoBtn').disabled = !history.length; renderPreview();
+  $('undoBtn').disabled = !history.length; $('clearAllBtn').disabled = !state.items.length; renderPreview();
 }
 function renderPreview() {
   const item = itemById(selected); $('itemTools').hidden = !item; document.querySelector('.preview-panel').hidden = !item;
@@ -206,6 +212,7 @@ function clearDrag() {
   document.body.classList.remove('dragging-item'); if (drag?.ghost) drag.ghost.remove(); document.querySelectorAll('.drag-source,.over,.insert-before,.insert-after').forEach(el => el.classList.remove('drag-source','over','insert-before','insert-after')); drag = null;
 }
 document.addEventListener('pointerdown', event => {
+  if (event.target.closest('.tile-remove')) return;
   const tileEl = event.target.closest('.tile'); if (!tileEl || event.button !== 0) return;
   drag = {id:tileEl.dataset.item,el:tileEl,x:event.clientX,y:event.clientY,pointer:event.pointerId,active:false};
   tileEl.setPointerCapture(event.pointerId);
@@ -354,6 +361,13 @@ $('moveBtn').onclick = () => move(selected,$('moveTarget').value); $('leftBtn').
 $('deleteBtn').onclick = () => move(selected,'trash');
 $('undoBtn').onclick = () => { if (!history.length) return; state = history.pop(); selected = null; commit(); toast('已撤销上一步'); };
 $('resetBtn').onclick = () => { if (!state.items.length) return; snapshot(); state.order.pool = [...state.tiers.flatMap(t => state.order[t.id]),...state.order.pool]; state.tiers.forEach(t => state.order[t.id] = []); commit(); toast('已全部移回待排名，可撤销。'); };
+$('clearAllBtn').onclick = () => {
+  if (importing) return toast('图片正在处理中，请完成后再清空。');
+  if (!state.items.length) return;
+  clearDrag(); snapshot(); state.items = []; selected = null;
+  for (const key of Object.keys(state.order)) state.order[key] = [];
+  commit(); toast('已清空全部图片和垃圾桶，点击“撤销”可恢复。');
+};
 $('backupBtn').onclick = () => { download(new Blob([JSON.stringify(state)],{type:'application/json'}),filename('json')); toast('项目已导出，包含图片和排名。'); };
 $('restoreBtn').onclick = () => $('projectInput').click(); $('projectInput').onchange = e => restoreProject(e.target.files[0]); $('exportBtn').onclick = exportImage;
 $('focusBtn').onclick = () => focusMode(true); $('exitFocus').onclick = () => focusMode(false);

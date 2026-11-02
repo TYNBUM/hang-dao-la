@@ -6,8 +6,8 @@
   <meta name="description" content="夯到拉图片排名，支持拖拽排序、自动保存、图片导出、录音和录屏。">
   <title>夯到拉排名</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ff7979'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44'%3E夯%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css?v=6">
-  <script src="./recorder.js" defer></script><script src="./app.js?v=6" defer></script>
+  <link rel="stylesheet" href="./style.css?v=7">
+  <script src="./recorder.js" defer></script><script src="./app.js?v=7" defer></script>
 </head>
 <body>
   <header class="topbar"><a class="brand" href="./">夯到拉排名</a><div class="top-actions"><span id="saveStatus" role="status" class="save-state">正在读取…</span><button id="helpBtn" class="quiet">使用说明</button></div></header>
@@ -15,7 +15,7 @@
     <div class="workspace">
       <section class="ranking" aria-label="排名工作区">
         <div class="board-heading"><div><label class="sr-only" for="boardTitle">榜单标题</label><input id="boardTitle" maxlength="50" value="我的夯到拉排行榜" aria-label="榜单标题"></div><span id="rankCount" class="counter">0 / 0 已排名</span></div>
-        <div class="toolbar"><div class="button-group"><button id="uploadBtn" class="primary">上传图片</button><button id="materialsBtn">Galgame 封面</button><button id="undoBtn" disabled title="Ctrl / ⌘ + Z">撤销</button><button id="editTiersBtn">修改栏目</button><button id="exportBtn">导出图片</button><button id="recordToggle" aria-expanded="false" aria-controls="recordPanel">录音 / 录屏</button><button id="focusBtn">专注模式</button></div><div class="view-options"><label class="theme-picker" for="themeSelect">底色 <select id="themeSelect"><option value="white">白底</option><option value="black">黑底</option></select></label><label class="name-toggle"><input id="namesToggle" type="checkbox">显示图片名</label></div></div>
+        <div class="toolbar"><div class="button-group"><button id="uploadBtn" class="primary">上传图片</button><button id="materialsBtn">Galgame 封面</button><button id="undoBtn" disabled title="Ctrl / ⌘ + Z">撤销</button><button id="clearAllBtn" class="danger" title="清空全部图片和垃圾桶，可撤销" disabled>清空全部</button><button id="editTiersBtn">修改栏目</button><button id="exportBtn">导出图片</button><button id="recordToggle" aria-expanded="false" aria-controls="recordPanel">录音 / 录屏</button><button id="focusBtn">专注模式</button></div><div class="view-options"><label class="theme-picker" for="themeSelect">底色 <select id="themeSelect"><option value="white">白底</option><option value="black">黑底</option></select></label><label class="name-toggle"><input id="namesToggle" type="checkbox">显示图片名</label></div></div>
         <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden>
         <div id="board" aria-label="分级排名板"></div>
         <div class="pool-heading"><h2>待排名 <span id="poolCount">0</span></h2><div class="pool-actions"><span>拖拽排序 · 点击图片可预览</span><button id="trashTarget" class="dropzone trash-target" data-zone="trash" aria-label="垃圾桶，拖入图片丢弃或点击查看"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><span>垃圾桶 <b id="trashCount">0</b></span></button></div></div>
